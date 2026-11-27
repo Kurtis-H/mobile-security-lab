@@ -18,6 +18,8 @@ A scanner's output isn't an assessment. MobSF rated three items "high" in this a
 
 Version 1.1 of the [report](REPORT.md) is the retest: 4 of 5 findings fixed and verified in a new release build (MS-01 to MS-04), and 1 accepted with its reason (MS-05).
 
+The live status of every finding is on the [quality dashboard](https://kurtis-h.github.io/quality-dashboard/), read from this repo's `findings.py`.
+
 ## Contained by design
 
 Nothing here runs on a personal machine or touches a real device. The APK is built from source in a fresh GitHub Actions runner. MobSF runs there in a throwaway container, pinned by image digest. The release signing key is generated for each run and discarded with the runner, so there is no secret to store.
