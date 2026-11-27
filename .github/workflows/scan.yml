@@ -1,0 +1,63 @@
+name: Mobile security scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 8 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Build the release APK and scan it
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      mobsf:
+        image: opensecurity/mobile-security-framework-mobsf:latest
+        env:
+          MOBSF_API_KEY: ci-only-not-a-secret-0123456789abcdef
+        ports: ["8000:8000"]
+    env:
+      MOBSF_API_KEY: ci-only-not-a-secret-0123456789abcdef
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/booking-mobile
+          path: target
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          cache: true
+      - name: Build the release APK, as a user would install it
+        working-directory: target
+        run: |
+          flutter pub get
+          flutter build apk --release
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: MobSF static analysis
+        run: python scripts/mobsf_scan.py target/build/app/outputs/flutter-apk/app-release.apk --out results/mobsf.json
+      - name: Summary
+        run: python scripts/summarize.py results/mobsf.json
+      - name: Image digest used (for pinning)
+        if: always()
+        run: docker image inspect opensecurity/mobile-security-framework-mobsf:latest --format '{{index .RepoDigests 0}}'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: mobsf-report
+          path: results/
