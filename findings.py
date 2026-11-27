@@ -47,7 +47,8 @@ FINDINGS = [
         mobsf="high",
         masvs="MASVS-RESILIENCE-2",
         mobsf_title="Application signed with debug certificate",
-        status="open",
+        status="fixed",
+        fixed_in="booking-mobile#21",
     ),
     Finding(
         id="MS-02",
@@ -56,7 +57,8 @@ FINDINGS = [
         mobsf="high",
         masvs="MASVS-NETWORK-1",
         mobsf_title="Domain config is insecurely configured to permit clear text traffic",
-        status="open",
+        status="fixed",
+        fixed_in="booking-mobile#21",
     ),
     Finding(
         id="MS-03",
@@ -65,7 +67,8 @@ FINDINGS = [
         mobsf="not detected",
         masvs="M1: Improper Credential Usage",
         mobsf_title="",
-        status="open",
+        status="fixed",
+        fixed_in="booking-mobile#21",
     ),
     Finding(
         id="MS-04",
@@ -74,7 +77,8 @@ FINDINGS = [
         mobsf="warning",
         masvs="MASVS-STORAGE-2",
         mobsf_title="android:allowBackup",
-        status="open",
+        status="fixed",
+        fixed_in="booking-mobile#21",
     ),
     Finding(
         id="MS-05",
@@ -83,7 +87,11 @@ FINDINGS = [
         mobsf="high",
         masvs="MASVS-CODE-1",
         mobsf_title="App can be installed on a vulnerable unpatched Android version",
-        status="open",
+        status="accepted",
+        accepted_because=(
+            "Wider device reach for a demo app that holds no data at rest: its only "
+            "secret lives in memory for the session. Revisit as Android 7 to 9 decline."
+        ),
     ),
 ]
 

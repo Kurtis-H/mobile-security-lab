@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Version | 1.0 (initial assessment) |
-| Date | 27 November 2026 |
+| Version | 1.1 (retest after remediation) |
+| Date | 27 November 2026 (assessment and retest) |
 | Prepared by | Kurtis H |
 | Target | The release APK of [booking-mobile](https://github.com/Kurtis-H/booking-mobile), built from `main` with Flutter stable |
 | Approach | Static analysis of the built APK with MobSF, plus manual review of the source and the APK |
@@ -11,6 +11,8 @@
 ## 1. Executive summary
 
 The Android app was assessed as a user would install it: the release APK, built from source in CI and scanned with MobSF. **5 findings were raised: 0 High, 2 Medium and 3 Low.** One of them (MS-03) was found by hand, not by the scanner. Every finding is checked by an automated test against each new build, so the report stays true as the app changes.
+
+**Retest (version 1.1):** four findings are fixed and verified in a new release build (MS-01 to MS-04). MS-05 is an accepted risk, with its reason. See [section 8](#8-retest).
 
 The two Medium findings are about how the release build is made, not about the app's code. The release APK is signed with the debug certificate (MS-01), and it still allows plain HTTP to the emulator and localhost addresses used in development (MS-02). Both come from development settings that also apply to release builds.
 
@@ -44,11 +46,11 @@ The app's own code holds up well. The API key is kept in memory only, never writ
 
 | ID | Finding | Severity | MobSF | MASVS | Status |
 |---|---|---|---|---|---|
-| MS-01 | The release build is signed with the debug certificate | Medium | high | MASVS-RESILIENCE-2 | open |
-| MS-02 | The release build allows plain HTTP to local addresses | Medium | high | MASVS-NETWORK-1 | open |
-| MS-03 | A demo API key is compiled into the release build | Low | not detected | M1: Improper Credential Usage | open |
-| MS-04 | App data can be backed up | Low | warning | MASVS-STORAGE-2 | open |
-| MS-05 | The app installs on Android 7, which gets no security updates | Low | high | MASVS-CODE-1 | open |
+| MS-01 | The release build is signed with the debug certificate | Medium | high | MASVS-RESILIENCE-2 | fixed (booking-mobile#21) |
+| MS-02 | The release build allows plain HTTP to local addresses | Medium | high | MASVS-NETWORK-1 | fixed (booking-mobile#21) |
+| MS-03 | A demo API key is compiled into the release build | Low | not detected | M1: Improper Credential Usage | fixed (booking-mobile#21) |
+| MS-04 | App data can be backed up | Low | warning | MASVS-STORAGE-2 | fixed (booking-mobile#21) |
+| MS-05 | The app installs on Android 7, which gets no security updates | Low | high | MASVS-CODE-1 | accepted |
 
 ## 5. Findings
 
@@ -127,6 +129,20 @@ The app's own code holds up well. The API key is kept in memory only, never writ
 | `ProfileInstallReceiver` exported, protected by `android.permission.DUMP` | AndroidX's profile installer. `DUMP` is a signature\|privileged permission, so only the system and adb shell can send to it. |
 | "The App uses an insecure Random Number Generator" | The hits are compiled AndroidX and Flutter embedding classes. The app's own code is Dart and never generates random values, and nothing security relevant is generated on the device. |
 | Logging and clipboard (info) | The same: library code. The app's Dart code doesn't log and doesn't copy to the clipboard. |
+
+## 8. Retest
+
+The fixes were retested on 27 November 2026: a new release APK was built from `main` of booking-mobile, scanned again, and checked with the same tests.
+
+| ID | Status | Fix ([booking-mobile#21](https://github.com/Kurtis-H/booking-mobile/pull/21)) | Retest result |
+|---|---|---|---|
+| MS-01 | fixed | Release builds are signed from `android/key.properties`, with no fallback to the debug key. Without it the build fails | Signed by the release key, not the debug certificate. MobSF no longer flags it |
+| MS-02 | fixed | Plain HTTP to the local API is allowed in debug and profile builds only. Release builds are HTTPS-only | No cleartext domain config in the release APK |
+| MS-03 | fixed | The demo key is a compile-time `null` in release builds, and the demo button is hidden | `key-user-1` is in none of the APK's `libapp.so` builds |
+| MS-04 | fixed | `allowBackup="false"`, plus data extraction rules that exclude everything on Android 12 and later | MobSF no longer flags backups |
+| MS-05 | accepted | Wider device reach for a demo app with no data at rest. Revisit as Android 7 to 9 decline | Still present, as expected |
+
+booking-mobile's own CI now also checks the release build on every change: a build without a key must fail, a keyed build must not be debug-signed, and the demo key must not be in the binary.
 
 ## Appendix A: Reproducing the findings
 

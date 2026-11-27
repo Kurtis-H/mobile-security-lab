@@ -98,6 +98,21 @@ jobs:
       - name: Image digest
         if: always()
         run: docker image ls --digests opensecurity/mobile-security-framework-mobsf
+      - name: Drop the secrets list before the report is uploaded
+        # Artifacts of a public repo can be downloaded by anyone signed in to
+        # GitHub, so the uploaded copy keeps only the count.
+        if: always()
+        run: |
+          [ -f results/mobsf.json ] || exit 0
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("results/mobsf.json")
+          report = json.loads(path.read_text())
+          report["secrets"] = f"{len(report.get('secrets') or [])} found; removed before upload"
+          path.write_text(json.dumps(report))
+          PY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
