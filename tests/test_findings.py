@@ -96,6 +96,8 @@ def test_ms05_installs_on_unsupported_android(report: dict) -> None:
 def test_nothing_found_where_nothing_should_be(report: dict, key: str) -> None:
     """Controls: no hard-coded secrets MobSF can see, and no trackers."""
     if key == "secrets":
-        assert report.get("secrets") == []
+        # Assert on the count only, so a failure never prints a secret to the public log.
+        found = len(report.get("secrets") or [])
+        assert found == 0, f"MobSF found {found} possible secrets: see the report artifact"
     else:
         assert not report.get("trackers", {}).get("detected_trackers")

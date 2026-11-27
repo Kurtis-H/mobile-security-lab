@@ -45,7 +45,8 @@ def main() -> None:
     print("== Binary analysis:")
     for name, f in items(report.get("binary_analysis", {})):
         print(f"  {name}: {json.dumps(f)[:200]}")
-    print("== Secrets:", report.get("secrets"))
+    # Only the count: the CI log is public, and a real secret must not land in it.
+    print("== Secrets found:", len(report.get("secrets") or []), "(see the report artifact)")
     print("== Permissions:")
     for name, f in items(report.get("permissions", {})):
         print(f"  [{f.get('status')}] {name}")
