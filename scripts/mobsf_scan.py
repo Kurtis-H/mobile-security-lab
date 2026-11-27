@@ -38,9 +38,13 @@ def form(path: str, **fields: str) -> dict:
 def upload(apk: Path) -> dict:
     boundary = uuid.uuid4().hex
     body = (
-        f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{apk.name}"\r\n'
-        "Content-Type: application/octet-stream\r\n\r\n"
-    ).encode() + apk.read_bytes() + f"\r\n--{boundary}--\r\n".encode()
+        (
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{apk.name}"\r\n'
+            "Content-Type: application/octet-stream\r\n\r\n"
+        ).encode()
+        + apk.read_bytes()
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
     return call("/api/v1/upload", body, f"multipart/form-data; boundary={boundary}")
 
 
@@ -65,7 +69,12 @@ def main() -> None:
     wait_until_up()
     uploaded = upload(args.apk)
     print(f"uploaded {uploaded['file_name']} ({uploaded['hash']})")
-    form("/api/v1/scan", hash=uploaded["hash"], scan_type=uploaded["scan_type"], file_name=uploaded["file_name"])
+    form(
+        "/api/v1/scan",
+        hash=uploaded["hash"],
+        scan_type=uploaded["scan_type"],
+        file_name=uploaded["file_name"],
+    )
     report = form("/api/v1/report_json", hash=uploaded["hash"])
     try:
         report["_scorecard"] = form("/api/v1/scorecard", hash=uploaded["hash"])

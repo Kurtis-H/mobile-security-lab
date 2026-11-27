@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
   schedule:
+    # Weekly: booking-mobile changes in its own repo, and the report must still be true.
     - cron: "17 8 * * 3"
   workflow_dispatch:
 
@@ -12,22 +13,44 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - run: pip install --require-hashes -r requirements.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - name: The report matches the register
+        run: python -m pytest -v -p no:cacheprovider tests/test_report.py
+
   scan:
-    name: Build the release APK and scan it
+    name: Scan the release APK and check the findings
     runs-on: ubuntu-latest
     timeout-minutes: 40
     services:
+      # MobSF runs in a throwaway container on the runner. It only ever sees
+      # the APK built below. Pinned by digest; Dependabot can't bump service
+      # images, so update the digest by hand from the "Image digest" step.
       mobsf:
-        image: opensecurity/mobile-security-framework-mobsf:latest
+        image: opensecurity/mobile-security-framework-mobsf@sha256:815bb96de3c78a22e0a0996c667c164a227239c9d8a4aba80f188d247b928954
         env:
           MOBSF_API_KEY: ci-only-not-a-secret-0123456789abcdef
         ports: ["8000:8000"]
     env:
       MOBSF_API_KEY: ci-only-not-a-secret-0123456789abcdef
+      REQUIRE_SCAN: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The target, at main: the report must stay true as the app changes.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/booking-mobile
@@ -41,6 +64,17 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: A throwaway release key, made for this run only
+        # The app's release signing reads android/key.properties. A key that
+        # exists for one run and is never stored stands in for the real one,
+        # so nothing secret is needed and nothing is kept.
+        working-directory: target/android
+        run: |
+          pass=$(openssl rand -hex 16)
+          keytool -genkeypair -noprompt -keystore app/scan-release.jks -storepass "$pass" -keypass "$pass" \
+            -alias scan -keyalg RSA -keysize 2048 -validity 1 -dname "CN=mobile-security-lab scan"
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=scan\nstoreFile=scan-release.jks\n' \
+            "$pass" "$pass" > key.properties
       - name: Build the release APK, as a user would install it
         working-directory: target
         run: |
@@ -49,13 +83,21 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
+      - run: pip install --require-hashes -r requirements.txt
       - name: MobSF static analysis
         run: python scripts/mobsf_scan.py target/build/app/outputs/flutter-apk/app-release.apk --out results/mobsf.json
       - name: Summary
         run: python scripts/summarize.py results/mobsf.json
-      - name: Image digest used (for pinning)
+      - name: Findings present (or stay fixed), every scanner item triaged, the report matches
+        run: python -m pytest -v -p no:cacheprovider
+      - name: Evidence
         if: always()
-        run: docker image inspect opensecurity/mobile-security-framework-mobsf:latest --format '{{index .RepoDigests 0}}'
+        run: |
+          [ -f results/evidence.md ] && cat results/evidence.md >> "$GITHUB_STEP_SUMMARY"
+          cat results/evidence.md 2>/dev/null || true
+      - name: Image digest
+        if: always()
+        run: docker image ls --digests opensecurity/mobile-security-framework-mobsf
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

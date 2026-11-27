@@ -1,6 +1,6 @@
 """Print the parts of a MobSF JSON report that matter, for the job log.
 
-    python scripts/summarize.py results/mobsf.json
+python scripts/summarize.py results/mobsf.json
 """
 
 from __future__ import annotations
